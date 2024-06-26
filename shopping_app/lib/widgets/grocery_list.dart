@@ -34,44 +34,64 @@ class _GroceryListState extends State<GroceryList> {
       'flutter-prep-d6dbc-default-rtdb.firebaseio.com',
       'shopping-list.json',
     );
-    final res = await http.get(url);
+    try {
+      final res = await http.get(url);
 
-    if (res.statusCode >= 400) {
-      setState(() {
-        _error = 'Failed to fetch data, please try again later';
-      });
-    }
+      if (res.statusCode >= 400) {
+        setState(() {
+          _error = 'Failed to fetch data, please try again later';
+        });
+      }
 
-    //per evitare il caricamento all'infinito quando elimino tutti gli item, aggiungo un controllo
-    //la stringa null dipende da Firsebase, un altro be potrebbe essere diverso
-    if (res.body == 'null') {
+      //per evitare il caricamento all'infinito quando elimino tutti gli item, aggiungo un controllo
+      //la stringa null dipende da Firsebase, un altro be potrebbe essere diverso
+      if (res.body == 'null') {
+        setState(() {
+          _isLoading = false;
+        });
+        return; //evito che carichi dei dati che non esistono più
+      }
+      if (res.statusCode >= 400) {
+        setState(() {
+          _error = 'Failed to fetch data, please try again later';
+        });
+      }
+
+      //per evitare il caricamento all'infinito quando elimino tutti gli item, aggiungo un controllo
+      //la stringa null dipende da Firsebase, un altro be potrebbe essere diverso
+      if (res.body == 'null') {
+        setState(() {
+          _isLoading = false;
+        });
+        return; //evito che carichi dei dati che non esistono più
+      }
+
+      final Map<String, dynamic> listData = json.decode(res.body);
+      final List<GroceryItem> loadedItems = [];
+      for (final item in listData.entries) {
+        final category = categories.entries
+            .firstWhere(
+                (catItem) => catItem.value.title == item.value['category'])
+            .value;
+        loadedItems.add(
+          GroceryItem(
+            id: item.key,
+            name: item.value['name'],
+            quantity: item.value['quantity'],
+            category: category,
+          ),
+        );
+      }
+      //quando viene eseguito di nuovo, interfaccia sarà aggiornata
       setState(() {
+        _groceryItems = loadedItems;
         _isLoading = false;
       });
-      return; //evito che carichi dei dati che non esistono più
+    } catch (e) {
+      setState(() {
+        _error = 'Something went wrong, please try again later';
+      });
     }
-
-    final Map<String, dynamic> listData = json.decode(res.body);
-    final List<GroceryItem> loadedItems = [];
-    for (final item in listData.entries) {
-      final category = categories.entries
-          .firstWhere(
-              (catItem) => catItem.value.title == item.value['category'])
-          .value;
-      loadedItems.add(
-        GroceryItem(
-          id: item.key,
-          name: item.value['name'],
-          quantity: item.value['quantity'],
-          category: category,
-        ),
-      );
-    }
-    //quando viene eseguito di nuovo, interfaccia sarà aggiornata
-    setState(() {
-      _groceryItems = loadedItems;
-      _isLoading = false;
-    });
   }
 
 //funzione che mi permette di passare alla pagina
