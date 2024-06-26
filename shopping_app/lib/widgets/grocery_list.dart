@@ -1,4 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+// import 'package:flutter/rendering.dart';
+
+import 'package:http/http.dart' as http;
+import 'package:shopping_app/data/categories.dart';
+
 import 'package:shopping_app/models/grocery_item.dart';
 import 'package:shopping_app/widgets/new_item.dart';
 
@@ -10,7 +17,45 @@ class GroceryList extends StatefulWidget {
 }
 
 class _GroceryListState extends State<GroceryList> {
-  final List<GroceryItem> _groceryItems = [];
+  List<GroceryItem> _groceryItems = [];
+  var _isLoading = true;
+
+  //inizializzo lo stato quando viene creato per la prima volta
+  @override
+  void initState() {
+    super.initState();
+    _loadItems();
+  }
+
+  void _loadItems() async {
+    //con Firebase recupero i dati dal db per mostrarli nella lista
+    final url = Uri.https(
+      'flutter-prep-d6dbc-default-rtdb.firebaseio.com',
+      'shopping-list.json',
+    );
+    final res = await http.get(url);
+    final Map<String, dynamic> listData = json.decode(res.body);
+    final List<GroceryItem> loadedItems = [];
+    for (final item in listData.entries) {
+      final category = categories.entries
+          .firstWhere(
+              (catItem) => catItem.value.title == item.value['category'])
+          .value;
+      loadedItems.add(
+        GroceryItem(
+          id: item.key,
+          name: item.value['name'],
+          quantity: item.value['quantity'],
+          category: category,
+        ),
+      );
+    }
+    //quando viene eseguito di nuovo, interfaccia sarà aggiornata
+    setState(() {
+      _groceryItems = loadedItems;
+      _isLoading = false;
+    });
+  }
 
 //funzione che mi permette di passare alla pagina
 //NewItem() che mi farà aggiungere un nuovo item
@@ -22,7 +67,6 @@ class _GroceryListState extends State<GroceryList> {
         builder: (ctx) => const NewItem(),
       ),
     );
-
     if (newItem == null) {
       return;
     }
@@ -30,6 +74,14 @@ class _GroceryListState extends State<GroceryList> {
     setState(() {
       _groceryItems.add(newItem);
     });
+    //senza firebase
+    // if (newItem == null) {
+    //   return;
+    // }
+
+    // setState(() {
+    //   _groceryItems.add(newItem);
+    // });
   }
 
   void _removeItem(GroceryItem item) {
@@ -43,7 +95,13 @@ class _GroceryListState extends State<GroceryList> {
     //creo un widget che mostra un messagio al centro se non c'è niente nella lista
     Widget content = const Center(child: Text('No items added yet'));
 
-//altrimenti mostra la ListView
+    if (_isLoading) {
+      content = const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    //altrimenti mostra la ListView
     if (_groceryItems.isNotEmpty) {
       content = ListView.builder(
         //faccio sapere a flutter quante volte dovrà chiamare groceryItems
