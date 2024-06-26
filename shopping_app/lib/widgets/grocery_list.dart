@@ -19,6 +19,7 @@ class GroceryList extends StatefulWidget {
 class _GroceryListState extends State<GroceryList> {
   List<GroceryItem> _groceryItems = [];
   var _isLoading = true;
+  String? _error; //può essere null ma se non lo è restituisce una String
 
   //inizializzo lo stato quando viene creato per la prima volta
   @override
@@ -34,6 +35,22 @@ class _GroceryListState extends State<GroceryList> {
       'shopping-list.json',
     );
     final res = await http.get(url);
+
+    if (res.statusCode >= 400) {
+      setState(() {
+        _error = 'Failed to fetch data, please try again later';
+      });
+    }
+
+    //per evitare il caricamento all'infinito quando elimino tutti gli item, aggiungo un controllo
+    //la stringa null dipende da Firsebase, un altro be potrebbe essere diverso
+    if (res.body == 'null') {
+      setState(() {
+        _isLoading = false;
+      });
+      return; //evito che carichi dei dati che non esistono più
+    }
+
     final Map<String, dynamic> listData = json.decode(res.body);
     final List<GroceryItem> loadedItems = [];
     for (final item in listData.entries) {
@@ -84,10 +101,23 @@ class _GroceryListState extends State<GroceryList> {
     // });
   }
 
-  void _removeItem(GroceryItem item) {
+  void _removeItem(GroceryItem item) async {
+    final index = _groceryItems.indexOf(item);
     setState(() {
       _groceryItems.remove(item);
     });
+
+    final url = Uri.https('flutter-prep-d6dbc-default-rtdb.firebaseio.com',
+        'shopping-list/${item.id}.json');
+
+    final response = await http.delete(url);
+
+    if (response.statusCode >= 400) {
+      //posso inserire un messaggio di errore
+      setState(() {
+        _groceryItems.insert(index, item);
+      });
+    }
   }
 
   @override
@@ -126,6 +156,10 @@ class _GroceryListState extends State<GroceryList> {
           ),
         ),
       );
+    }
+
+    if (_error != null) {
+      content = Center(child: Text(_error!));
     }
 
     return Scaffold(
